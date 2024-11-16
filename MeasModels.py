@@ -42,3 +42,13 @@ class RangeMeas(MeasurementModel):
         if noise:
             z += mvrn(np.zeros_like(z), self.get_R(t, x))
         return z
+
+
+class DeclinationRA(MeasurementModel):
+    def get_measurement(self, t, x, noise=False):
+        RA = np.atan2(x[1], x[0])
+        Decl = np.atan2(x[2], np.linalg.norm(x[:2]))
+        z = np.array([RA, Decl])
+        if noise:
+            z += mvrn(np.zeros_like(z), self.get_R(t, x))
+        return z

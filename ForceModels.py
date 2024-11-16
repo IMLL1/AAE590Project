@@ -35,7 +35,7 @@ class DynamicsModel:
 
     def propagate_x(self, t, x, dt, noise_t_vec=()):
         f = lambda t, x: self.get_deriv(t, x, noise_t_vec)
-        x1 = solve_ivp(f, [t, t + dt], x, t_eval=[t + dt]).y
+        x1 = solve_ivp(f, [t, t + dt], x, t_eval=[t + dt]).y.flatten()
         return x1
 
     def get_truth(self, x0, tk, noise_t_vec=()):
