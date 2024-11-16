@@ -69,7 +69,7 @@ class EKF(Filter):
         zhat = self.measModel.get_measurement(t, self.x)
         y = z - zhat
         self.x = self.x + K @ y
-        self.P = self.P - C @ K.T - K @ C.T + np.outer(K @ W, K)
+        self.P = self.P - C @ K.T - K @ C.T + K @ W @ K.T
 
         return (
             self.x,
@@ -110,8 +110,12 @@ class UKF(Filter):
     def get_sigmapoints(self):
         X0 = self.x
         chol = np.linalg.cholesky(self.P)
-        X_stepm = [self.x + np.sqrt(self.n + self.lam) * chol[:, i] for i in range(self.n)]
-        X_stepp = [self.x - np.sqrt(self.n + self.lam) * chol[:, i] for i in range(self.n)]
+        X_stepm = [
+            self.x + np.sqrt(self.n + self.lam) * chol[:, i] for i in range(self.n)
+        ]
+        X_stepp = [
+            self.x - np.sqrt(self.n + self.lam) * chol[:, i] for i in range(self.n)
+        ]
         X = [X0, *X_stepm, *X_stepp]
         return X
 
@@ -123,13 +127,16 @@ class UKF(Filter):
         # propagated sigma points
         Xk = [self.dynamicsModel.propagate_x(t, X, dt, noise_t_vec) for X in Xkm1]
         self.x = np.sum([self.wm[i] * Xk[i] for i in range(1 + 2 * self.n)], axis=0)
-        self.P = np.sum(
-            [
-                self.wc[i] * np.outer((Xk[i] - self.x), (Xk[i] - self.x))
-                for i in range(1 + 2 * self.n)
-            ],
-            axis=0,
-        ) + G @ Q @ G.T
+        self.P = (
+            np.sum(
+                [
+                    self.wc[i] * np.outer((Xk[i] - self.x), (Xk[i] - self.x))
+                    for i in range(1 + 2 * self.n)
+                ],
+                axis=0,
+            )
+            + G @ Q @ G.T
+        )
         return self.x, self.P
 
     def update(self, z, t):
@@ -155,7 +162,7 @@ class UKF(Filter):
         K = np.atleast_2d(np.linalg.solve(Pz.T, Pxz.T).T)
         y = z - zhat
         self.x = self.x + K @ y
-        self.P = self.P - Pxz @ K.T - K @ Pxz.T + np.outer(K @ Pz, K)
+        self.P = self.P - Pxz @ K.T - K @ Pxz.T + K @ Pz @ K.T
 
         return (
             self.x,

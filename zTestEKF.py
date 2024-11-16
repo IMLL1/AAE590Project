@@ -20,7 +20,7 @@ def calc_period(state, mu):
 
 
 G = np.array([[0, 0], [0, 0], [1, 0], [0, 1]])
-Q = np.array([[1e-6**2, 0], [0, 1e-6**2]])
+Q = np.array([[1e-4**2, 0], [0, 1e-4**2]])
 R = np.array([[1e-2**2]])
 
 
@@ -38,7 +38,7 @@ pregenerated_rand = [rand(loc=0, scale=1, size=(2)) for i in tcont]
 
 sensor = RangeMeas(R)
 propagator = Kepler2D(Q, G, mu)
-P0 = np.diag([5e-2**2, 5e-2**2, 1e-3**2, 1e-3**2])
+P0 = np.diag([10**2, 4**2, 1e-2**2, 1e-2**2])
 xhat0 = np.random.multivariate_normal(x0, P0)
 ekf = EKF(sensor, propagator, xhat0, P0)
 

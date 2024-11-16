@@ -44,6 +44,28 @@ class RangeMeas(MeasurementModel):
         return z
 
 
+class RangeMeas2D(MeasurementModel):
+    def get_measurement(self, t, x, noise=False):
+        z = np.array([np.linalg.norm(x[:2])])
+        if noise:
+            z += mvrn(np.zeros_like(z), self.get_R(t, x))
+        return z
+
+
+class RangeAndRArate2D(MeasurementModel):
+    def get_measurement(self, t, x, noise=False):
+        z = np.zeros(2)
+        r = x[:2]
+        rmag = np.linalg.norm(r)
+        z[0] = rmag
+        v = x[2:]
+        vperp = v - np.dot(v, r / rmag)
+        z[1] = np.linalg.norm(vperp / rmag)
+        if noise:
+            z += mvrn(np.zeros_like(z), self.get_R(t, x))
+        return z
+
+
 class DeclinationRA(MeasurementModel):
     def get_measurement(self, t, x, noise=False):
         RA = np.atan2(x[1], x[0])
