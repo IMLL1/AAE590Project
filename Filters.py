@@ -102,7 +102,7 @@ class UKF(Filter):
 
         # define weights
         w0m = self.lam / (self.n + self.lam)
-        w0c = w0m + (1 - self.alpha**2 + self.beta**2)
+        w0c = w0m + (1 - self.alpha**2 + self.beta)
         wi = 1 / (2 * (self.n + self.lam))
         self.wm = [w0m, *[wi] * (2 * self.n)]
         self.wc = [w0c, *[wi] * (2 * self.n)]

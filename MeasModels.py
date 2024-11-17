@@ -36,6 +36,15 @@ class PosMeas(MeasurementModel):
         return z
 
 
+class PosMeas2D(MeasurementModel):
+    def get_measurement(self, t, x, noise=False):
+        z = x[:2]
+        if noise:
+            z += mvrn(np.zeros_like(z), self.get_R(t, x))
+
+        return z
+
+
 class RangeMeas(MeasurementModel):
     def get_measurement(self, t, x, noise=False):
         z = np.array([np.linalg.norm(x[:3])])

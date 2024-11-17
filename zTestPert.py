@@ -4,28 +4,22 @@ import matplotlib.pyplot as plt
 from numpy.random import normal as rand
 from Filters import UKF
 from ForceModels import Kepler2D
-from MeasModels import RangeAndRArate2D
+from MeasModels import PosMeas2D
 from tqdm import tqdm
 
 np.random.seed(0)
 
 
 ######################### problem-specific functions #########################
-def calc_period(state, mu):
-    r = state[:2]
-    v = state[2:]
-    energy = 0.5 * np.linalg.norm(v) ** 2 - mu / np.linalg.norm(r)
-    a = -mu / (2 * energy)
-    P = 2 * np.pi * np.sqrt(a**3 / mu)
-    return P
 
 
-G = np.array([[0, 0], [0, 0], [1, 0], [0, 1]])
-Q = (
-    lambda t, x: np.array([[1e-5**2, 0], [0, 1e-5**2]])
-    / np.linalg.norm(x[:2] / 6500) ** 2
-)
-R = np.diag([1e-2, 1e-5])
+def Q(t, x):
+    rmag = np.linalg.norm(x[:2] / 6500) ** 2
+    return np.array([[1e-5**2, 0], [0, 1e-5**2]]) / rmag
+
+
+G = np.array([[0, 0], [0, 0], [1, 0], [0, 1]])  # , [0, 0], [0, 0]])
+R = np.diag([1e-2, 1e-2])
 
 
 ######################### problem-specific functions #########################
@@ -36,15 +30,15 @@ x0 = np.array([6750, 0, 0, 10])
 
 nx = len(x0)
 
-t = np.arange(0, calc_period(x0, mu), 60)  # sec
-tcont = np.linspace(t[0], t[-1], 10 * len(t) - 1)  # "continuous" t values
+t = np.arange(0, 10 * 60 * 60, 60 * 5)  # sec
+tcont = np.linspace(t[0], t[-1], 25 * len(t) - 1)  # "continuous" t values
 pregenerated_rand = [rand(loc=0, scale=1, size=(2)) for i in tcont]
 
-sensor = RangeAndRArate2D(R)
+sensor = PosMeas2D(R)
 propagator = Kepler2D(Q, G, mu)
-P0 = np.diag([2**2, 2**2, 1e-2**2, 1e-2**2])
+P0 = np.diag([0.05**2, 0.05**2, 1e-3**2, 1e-3**2])
 xhat0 = np.random.multivariate_normal(x0, P0)
-ekf = UKF(sensor, propagator, xhat0, P0)
+ekf = UKF(sensor, propagator, xhat0, P0, alpha=1e-3, beta=100)
 
 # get truth and measurements
 truth = propagator.get_truth(x0, t, (pregenerated_rand, tcont))
