@@ -3,8 +3,8 @@ from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 from numpy.random import normal as rand
 from Filters import UKF
-from ForceModels import Kepler2D
-from MeasModels import RangeAndRArate2D
+from ForceModels import Kepler
+from MeasModels import RangeAndRArate
 from tqdm import tqdm
 
 np.random.seed(0)
@@ -25,7 +25,7 @@ Q = (
     lambda t, x: np.array([[1e-5**2, 0], [0, 1e-5**2]])
     / np.linalg.norm(x[:2] / 6500) ** 2
 )
-R = np.diag([1e-2, 1e-5])
+R = np.diag([1e-3, 1e-4])
 
 
 ######################### problem-specific functions #########################
@@ -40,11 +40,11 @@ t = np.arange(0, calc_period(x0, mu), 60)  # sec
 tcont = np.linspace(t[0], t[-1], 10 * len(t) - 1)  # "continuous" t values
 pregenerated_rand = [rand(loc=0, scale=1, size=(2)) for i in tcont]
 
-sensor = RangeAndRArate2D(R)
-propagator = Kepler2D(Q, G, mu)
+sensor = RangeAndRArate(R, planar=True)
+propagator = Kepler(Q, G, mu, planar=True)
 P0 = np.diag([2**2, 2**2, 1e-2**2, 1e-2**2])
 xhat0 = np.random.multivariate_normal(x0, P0)
-ekf = UKF(sensor, propagator, xhat0, P0)
+ekf = UKF(sensor, propagator, xhat0, P0, alpha=1e-5, beta=1e4)
 
 # get truth and measurements
 truth = propagator.get_truth(x0, t, (pregenerated_rand, tcont))

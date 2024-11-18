@@ -1,10 +1,9 @@
 import numpy as np
-from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 from numpy.random import normal as rand
 from Filters import UKF
-from ForceModels import Kepler2D
-from MeasModels import PosMeas2D
+from ForceModels import KeplerPerurbed
+from MeasModels import PosMeas
 from tqdm import tqdm
 
 np.random.seed(0)
@@ -18,7 +17,7 @@ def Q(t, x):
     return np.array([[1e-5**2, 0], [0, 1e-5**2]]) / rmag
 
 
-G = np.array([[0, 0], [0, 0], [1, 0], [0, 1]])  # , [0, 0], [0, 0]])
+G = np.array([[0, 0], [0, 0], [1, 0], [0, 1], [0, 0], [0, 0]])
 R = np.diag([1e-2, 1e-2])
 
 
@@ -26,19 +25,24 @@ R = np.diag([1e-2, 1e-2])
 # continuous and discrete dt
 
 mu = 3.986004418e5  # km3/s2
-x0 = np.array([6750, 0, 0, 10])
+x0 = [6750, 0, 0, 10]
+pert_vec = [-0.55 * 1e-5, 0.25 * 1e-5]
 
+x0 = [*x0, *pert_vec]
 nx = len(x0)
 
-t = np.arange(0, 10 * 60 * 60, 60 * 5)  # sec
+t = np.arange(0, 10 * 60 * 60, 60)  # sec
 tcont = np.linspace(t[0], t[-1], 25 * len(t) - 1)  # "continuous" t values
 pregenerated_rand = [rand(loc=0, scale=1, size=(2)) for i in tcont]
 
-sensor = PosMeas2D(R)
-propagator = Kepler2D(Q, G, mu)
-P0 = np.diag([0.05**2, 0.05**2, 1e-3**2, 1e-3**2])
+sensor = PosMeas(R, planar=True)
+propagator = KeplerPerurbed(Q, G, mu, pert_vec, planar=True)
+
+P0 = np.diag([0.05**2, 0.05**2, 5e-3**2, 5e-3**2, 0.25**2, 0.25**2])
 xhat0 = np.random.multivariate_normal(x0, P0)
-ekf = UKF(sensor, propagator, xhat0, P0, alpha=1e-3, beta=100)
+xhat0[4:] = 0
+
+ekf = UKF(sensor, propagator, xhat0, P0, alpha=1e-5, beta=1e3)
 
 # get truth and measurements
 truth = propagator.get_truth(x0, t, (pregenerated_rand, tcont))
@@ -67,7 +71,7 @@ for k in tqdm(range(1, len(t))):
     epsilons.append(yk)
 
 
-xhat = np.reshape(xhatp, (-1, 4))
+xhat = np.reshape(xhatp, (-1, nx))
 truth = np.array(truth)
 
 # do the same thing to xcont to compare
