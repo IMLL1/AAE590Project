@@ -35,7 +35,7 @@ class Filter:
         return NotImplementedError()
 
 
-class EKF(Filter):
+class ExtendedKalmanFilter(Filter):
     def propagate(self, t, dt, noise_t_vec=()):
         sv0 = np.array([*self.x, *self.P.flatten()])
         nx = len(self.x)
@@ -73,16 +73,11 @@ class EKF(Filter):
         self.P = self.P - C @ K.T - K @ C.T + K @ W @ K.T
         self.P = (self.P + self.P.T) / 2
 
-        return (
-            self.x,
-            self.P,
-            W,
-            y,
-        )
+        return self.x, self.P, W, y
 
 
 # UKF uses SUT
-class UKF(Filter):
+class UnscentedKalmanFilter(Filter):
     def __init__(
         self,
         measModel: MeasurementModel,
@@ -169,9 +164,71 @@ class UKF(Filter):
         self.P = self.P - Pxz @ K.T - K @ Pxz.T + K @ Pz @ K.T
         self.P = (self.P + self.P.T) / 2
 
-        return (
-            self.x,
-            self.P,
-            Pz,
-            y,
+        return self.x, self.P, Pz, y
+
+
+# UKF uses SUT
+class CubatureKalmanFilter(Filter):
+    def __init__(
+        self,
+        measModel: MeasurementModel,
+        dynamicsModel: DynamicsModel,
+        x0: npt.ArrayLike,
+        P0: npt.ArrayLike,
+    ):
+        super().__init__(measModel, dynamicsModel, x0, P0)
+
+        # parameters
+        n = len(self.x)
+        self.xi = np.sqrt(n) * np.block([np.identity(n), -np.identity(n)])
+        self.n = n
+
+    def get_sigmapoints(self):
+        chol = np.linalg.cholesky(self.P)
+        X = [self.x + chol @ self.xi[:, i] for i in range(2 * self.n)]
+        return X
+
+    def propagate(self, t, dt, noise_t_vec=()):
+        Q = self.dynamicsModel.get_Q(t, self.x)
+        G = self.dynamicsModel.G
+        # sigma points
+        Xkm1 = self.get_sigmapoints()
+        # propagated sigma points
+        Xk = [self.dynamicsModel.propagate_x(t, X, dt, noise_t_vec) for X in Xkm1]
+        self.x = sum(Xk) / (2 * self.n)
+        self.P = (
+            np.sum(
+                [
+                    np.outer((Xk[i] - self.x), (Xk[i] - self.x))
+                    for i in range(2 * self.n)
+                ],
+                axis=0,
+            )
+            / (2 * self.n)
+            + G @ Q @ G.T
         )
+        self.P = (self.P + self.P.T) / 2
+
+        return self.x, self.P
+
+    def update(self, z, t):
+        # X sigma points
+        Xsp = self.get_sigmapoints()
+        # Z sigma points
+        Zsp = [self.measModel.get_measurement(t, X) for X in Xsp]
+        zhat = sum(Zsp) / (2 * self.n)
+        Pz = np.sum(
+            [np.outer((Zsp[i] - zhat), (Zsp[i] - zhat)) for i in range(2 * self.n)],
+            axis=0,
+        ) / (2 * self.n) + self.measModel.get_R(t, self.x)
+        Pxz = np.sum(
+            [np.outer((Xsp[i] - self.x), (Zsp[i] - zhat)) for i in range(2 * self.n)],
+            axis=0,
+        ) / (2 * self.n)
+        K = np.atleast_2d(np.linalg.solve(Pz.T, Pxz.T).T)
+        y = z - zhat
+        self.x = self.x + K @ y
+        self.P = self.P - Pxz @ K.T - K @ Pxz.T + K @ Pz @ K.T
+        self.P = (self.P + self.P.T) / 2
+
+        return self.x, self.P, Pz, y
