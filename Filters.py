@@ -58,6 +58,7 @@ class EKF(Filter):
         ).y.flatten()
         self.x = sv[:nx]
         self.P = np.reshape(sv[nx:], (nx, nx))
+        self.P = (self.P + self.P.T) / 2
 
         return self.x, self.P
 
@@ -70,6 +71,7 @@ class EKF(Filter):
         y = z - zhat
         self.x = self.x + K @ y
         self.P = self.P - C @ K.T - K @ C.T + K @ W @ K.T
+        self.P = (self.P + self.P.T) / 2
 
         return (
             self.x,
@@ -137,6 +139,8 @@ class UKF(Filter):
             )
             + G @ Q @ G.T
         )
+        self.P = (self.P + self.P.T) / 2
+
         return self.x, self.P
 
     def update(self, z, t):
@@ -163,6 +167,7 @@ class UKF(Filter):
         y = z - zhat
         self.x = self.x + K @ y
         self.P = self.P - Pxz @ K.T - K @ Pxz.T + K @ Pz @ K.T
+        self.P = (self.P + self.P.T) / 2
 
         return (
             self.x,

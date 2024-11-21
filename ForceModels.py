@@ -84,3 +84,24 @@ class KeplerPerurbed(DynamicsModel):
             dx += add_noise(self, t, x, noise_t_vec[0], noise_t_vec[1])
 
         return dx
+
+
+class KeplerMass(DynamicsModel):
+    def __init__(self, Q, G, planar=False):
+        super().__init__(Q, G, planar)
+        # state: x y vx vy px py mu
+
+    def get_deriv(self, t, x, noise_t_vec=()):
+        dx = np.zeros_like(x)
+        r = x[:2] if self.planar else x[:3]
+        rmag = np.linalg.norm(r)
+        dpos = x[2:4] if self.planar else x[3:6]
+        muidx = -1
+        accel = -r * x[muidx] / rmag**3
+        end = 4 if self.planar else 6
+        dx[:end] = np.array([*dpos, *accel])
+
+        if len(noise_t_vec) == 2:  # if noise
+            dx += add_noise(self, t, x, noise_t_vec[0], noise_t_vec[1])
+
+        return dx
