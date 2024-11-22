@@ -73,3 +73,19 @@ class DeclinationRA(MeasurementModel):
         if noise:
             z += mvrn(np.zeros_like(z), self.get_R(t, x))
         return z
+
+
+class RangeDeclinationRA(MeasurementModel):
+    def __init__(self, R, planar=False):
+        super().__init__(R, planar)
+        # cannot be planar
+        assert not self.planar
+
+    def get_measurement(self, t, x, noise=False):
+        RA = np.atan2(x[1], x[0])
+        decl = np.atan2(x[2], np.linalg.norm(x[:2]))
+        rho = np.linalg.norm(x[:3])
+        z = np.array([rho, RA, decl])
+        if noise:
+            z += mvrn(np.zeros_like(z), self.get_R(t, x))
+        return z

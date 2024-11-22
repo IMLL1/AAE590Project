@@ -9,7 +9,7 @@ from tqdm import tqdm
 np.random.seed(0)
 
 
-######################### problem-specific functions #########################
+# %% Configurable
 
 
 def Q(t, x):  # mostly drag
@@ -17,22 +17,19 @@ def Q(t, x):  # mostly drag
     return 0.1e-3**2 * np.identity(3) / rmag
 
 
-# Q = np.array([[0.1e-3**2, 0], [0, 0.1e-3**2]])
-
-
-G = np.array(
-    [[0, 0, 0], [0, 0, 0], [0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 1, 0], [0, 0, 0]]
-)
+G = np.block([np.zeros((3, 3)), np.identity(3), np.zeros((3, 1))]).T
 R = np.diag([10e-3**2, 10e-3**2, 10e-3**2])
-# 10 meters
 
-######################### problem-specific functions #########################
+x0 = [6750, 0, 0, 0, 6, 8]
+P0 = np.diag([*[0.1**2] * 3, *[0.1**2] * 3, 1e3**2])
+
+case = r"EKF/Pos Measurement/$\mu$ Estimation"
+
+
+# %% setup
 # continuous and discrete dt
 
 mu = 3.9861e5  # km3/s2
-x0 = [6750, 0, 0, 0, 10, 0]
-
-case = r"EKF/Pos Measurement/$\mu$ Estimation"
 
 t = np.arange(0, 10 * 60 * 60, 60 * 5)  # sec
 tcont = np.linspace(t[0], t[-1], 100 * len(t) - 1)  # "continuous" t values
@@ -41,13 +38,10 @@ pregenerated_rand = [rand(loc=0, scale=1, size=(len(x0) // 2)) for i in tcont]
 x0 = [*x0, mu]
 nx = len(x0)
 
-
 sensor = PosMeas(R, planar=False)
 propagator = KeplerMass(Q, G, planar=False)
 
-P0 = np.diag([*[0.1**2] * 3, *[0.001**2] * 3, 3e2**2])
 xhat0 = np.random.multivariate_normal(x0, P0)
-xhat0[-1] = mu + 1e3
 
 kf = ExtendedKalmanFilter(sensor, propagator, xhat0, P0)
 
@@ -63,6 +57,7 @@ Pp = [P0]  # all posterior covariances
 Ws = [np.full((3, 3), np.nan)]
 epsilons = [np.full(3, np.nan)]
 
+# %% filter
 dt = t[2] - t[1]
 for k in tqdm(range(1, len(t))):
     kf.propagate(t[k - 1], dt)
@@ -88,7 +83,7 @@ bars = 3 * np.sqrt(np.array([np.diag(P) for P in Pp]))
 epsilons = np.array(epsilons)
 innovbars = 3 * np.sqrt(np.array([np.diag(W) for W in Ws]))
 
-# %%
+# %% analysis
 plt.rcParams.update({"text.usetex": True, "font.family": "Computer Modern"})
 
 fig, ax = plt.subplots(3, 3, layout="tight")
