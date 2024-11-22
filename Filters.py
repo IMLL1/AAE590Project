@@ -197,12 +197,11 @@ class CubatureKalmanFilter(Filter):
         Xk = [self.dynamicsModel.propagate_x(t, X, dt, noise_t_vec) for X in Xkm1]
         self.x = sum(Xk) / (2 * self.n)
         self.P = (
-            np.sum(
+            sum(
                 [
                     np.outer((Xk[i] - self.x), (Xk[i] - self.x))
                     for i in range(2 * self.n)
-                ],
-                axis=0,
+                ]
             )
             / (2 * self.n)
             + G @ Q @ G.T
@@ -217,13 +216,11 @@ class CubatureKalmanFilter(Filter):
         # Z sigma points
         Zsp = [self.measModel.get_measurement(t, X) for X in Xsp]
         zhat = sum(Zsp) / (2 * self.n)
-        Pz = np.sum(
-            [np.outer((Zsp[i] - zhat), (Zsp[i] - zhat)) for i in range(2 * self.n)],
-            axis=0,
+        Pz = sum(
+            [np.outer((Zsp[i] - zhat), (Zsp[i] - zhat)) for i in range(2 * self.n)]
         ) / (2 * self.n) + self.measModel.get_R(t, self.x)
-        Pxz = np.sum(
-            [np.outer((Xsp[i] - self.x), (Zsp[i] - zhat)) for i in range(2 * self.n)],
-            axis=0,
+        Pxz = sum(
+            [np.outer((Xsp[i] - self.x), (Zsp[i] - zhat)) for i in range(2 * self.n)]
         ) / (2 * self.n)
         K = np.atleast_2d(np.linalg.solve(Pz.T, Pxz.T).T)
         y = z - zhat

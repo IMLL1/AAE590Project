@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numpy.random import normal as rand
 from Filters import CubatureKalmanFilter
-from ForceModels import KeplerMass
+from ForceModels import KeplerPerurbed
 from MeasModels import PosMeas
 from tqdm import tqdm
 
@@ -12,36 +12,35 @@ np.random.seed(0)
 ######################### problem-specific functions #########################
 
 
-# def Q(t, x):
-#     rmag = np.linalg.norm(x[:2] / 6500)
-#     return np.array([[0.1e-3**2, 0], [0, 0.1e-3**2]]) / rmag
-
-Q = np.array([[0.1e-3**2, 0], [0, 0.1e-3**2]])
+def Q(t, x):
+    rmag = np.linalg.norm(x[:2] / 6500) ** 2
+    return np.array([[10e-5**2, 0], [0, 10e-5**2]]) / rmag
 
 
-G = np.array([[0, 0], [0, 0], [1, 0], [0, 1], [0, 0]])
-R = np.diag([1e-1**2, 1e-1**2])
+G = np.array([[0, 0], [0, 0], [1, 0], [0, 1], [0, 0], [0, 0]])
+R = np.diag([1e-2, 1e-2]) ** 2
 
 
 ######################### problem-specific functions #########################
 # continuous and discrete dt
 
-mu = 3.9861e5  # km3/s2
+mu = 3.986004418e5  # km3/s2
 x0 = [6750, 0, 0, 10]
+pert_vec = [-0.55 * 1e-5, 0.25 * 1e-5]
 
-x0 = [*x0, mu]
+x0 = [*x0, *pert_vec]
 nx = len(x0)
 
 t = np.arange(0, 10 * 60 * 60, 60)  # sec
-tcont = np.linspace(t[0], t[-1], 100 * len(t) - 1)  # "continuous" t values
+tcont = np.linspace(t[0], t[-1], 25 * len(t) - 1)  # "continuous" t values
 pregenerated_rand = [rand(loc=0, scale=1, size=(2)) for i in tcont]
 
 sensor = PosMeas(R, planar=True)
-propagator = KeplerMass(Q, G, planar=True)
+propagator = KeplerPerurbed(Q, G, mu, pert_vec, planar=True)
 
-P0 = np.diag([0.1**2, 0.1**2, 1e-2**2, 1e-2**2, 3e2**2])
+P0 = np.diag([0.05**2, 0.05**2, 5e-3**2, 5e-3**2, 50e-5**2, 50e-5**2])
 xhat0 = np.random.multivariate_normal(x0, P0)
-xhat0[-1] = mu + 1e2
+xhat0[4:] = 0
 
 ekf = CubatureKalmanFilter(sensor, propagator, xhat0, P0)
 
@@ -78,8 +77,6 @@ truth = np.array(truth)
 # do the same thing to xcont to compare
 err = xhat - truth
 bars = 3 * np.sqrt(np.array([np.diag(P) for P in Pp]))
-err[:, -1] /= mu
-bars[:, -1] /= mu
 
 plt.figure()
 plt.plot(truth[:, 0], truth[:, 1], label="Truth", lw=1)
@@ -93,10 +90,10 @@ plt.title("Cartesian State")
 
 fig, ax = plt.subplots(3, 2, layout="constrained")
 fig.suptitle("Covariance Analysis")
-params = ["x", "y", "v_x", "v_y", "\\mu"]
+params = ["x", "y", "v_x", "v_y", "a_x", "a_y"]
 symbols = params
-units = ["km", "km", "km/s", "km/s", "prop err"]
-for i in range(5):
+units = ["km", "km", "km/s", "km/s", "km/s^2", "km/s^2"]
+for i in range(6):
     ax[i // 2, i % 2].step(
         t, bars[:, i], "-r", lw=1, alpha=0.5, label="$\\pm3\\sigma$ Bounds"
     )
@@ -122,9 +119,9 @@ epsilons = np.array(epsilons)
 innovbars = 3 * np.sqrt(np.array([np.diag(W) for W in Ws]))
 fig, ax = plt.subplots(2, 1, layout="constrained")
 fig.suptitle("Innovations Test")
-params = ["x", "y"]
-symbols = ["x", "y"]
-units = ["km", "km"]
+params = ["Range", "TA Rate"]
+symbols = ["R", "\\dot{\\theta}"]
+units = ["km", "rad/s"]
 for i in range(2):
     ax[i].plot(t, innovbars[:, i], "-r", lw=1, alpha=0.5, label="$\\pm3\\sigma$ Bounds")
     ax[i].plot(t, -innovbars[:, i], "-r", lw=1, alpha=0.5)
