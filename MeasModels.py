@@ -89,3 +89,36 @@ class RangeDeclinationRA(MeasurementModel):
         if noise:
             z += mvrn(np.zeros_like(z), self.get_R(t, x))
         return z
+
+
+class WalkerPseudorange(MeasurementModel):
+    def __init__(self, R, i, t, p, f, r_sats, planar=False):
+        super().__init__(R, planar)
+        assert not planar
+        npp = t // p
+        df = 2 * np.pi * f / t
+        thspace = np.linspace(0, 2 * np.pi, npp, False)
+        R1 = lambda th: np.array(
+            [[1, 0, 0], [0, np.cos(th), -np.sin(th)], [0, np.sin(th), np.cos(th)]]
+        )
+        R3 = lambda th: np.array(
+            [[np.cos(th), -np.sin(th), 0], [np.sin(th), np.cos(th), 0], [0, 0, 1]]
+        )
+        pts = []
+        for pn in range(p):
+            r = np.array([r_sats, 0, 0])
+            Omega = pn * 2 * np.pi / p
+            thplane = thspace + df * pn
+            for thta in thplane:
+                pts.append(R3(thta) @ R1(i) @ R3(Omega) @ r)
+
+        self.pts = pts
+        self.n = t
+
+        # generate position from walker
+
+    def get_measurement(self, t, x, noise=False):
+        z = [np.linalg.norm(sat - x[:3]) for sat in self.pts]
+        if noise:
+            z += mvrn(np.zeros_like(z), self.get_R(t, x))
+        return z
