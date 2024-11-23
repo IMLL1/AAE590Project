@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numpy.random import normal as rand
 from Filters import UnscentedKalmanFilter
-from ForceModels import KeplerMass
+from ForceModels import Kepler
 from MeasModels import PosMeas
 from tqdm import tqdm
 
@@ -12,12 +12,10 @@ np.random.seed(0)
 ######################### problem-specific functions #########################
 
 
-def Q(t, x):
-    rmag = np.linalg.norm(x[:2] / 6500)
-    return (np.diag([*[1e-3] * 2, *[0.1e-3] * 2]) / rmag) ** 2
+Q = np.diag([1e-3, 1e-3, 1e-5, 1e-5]) ** 2
 
 
-G = np.vstack((np.identity(4), [0, 0, 0, 0]))
+G = np.identity(4)
 R = np.diag([1e-2**2, 1e-2**2])
 
 
@@ -25,25 +23,21 @@ R = np.diag([1e-2**2, 1e-2**2])
 # continuous and discrete dt
 
 mu = 3.9861e5  # km3/s2
-x0 = [6750, 0, 0, 10]
+x0 = [6450, 0, 0, 7.5]
 
-x0 = [*x0, mu]
 nx = len(x0)
 
-t = np.arange(0, 10 * 60 * 60, 60)  # sec
-tcont = np.linspace(t[0], t[-1], 25 * len(t) - 1)  # "continuous" t values
-pregenerated_rand = [0 * rand(loc=0, scale=1, size=(4)) for i in tcont]
+t = np.arange(0, 0.25 * 60 * 60, 10)  # sec
+tcont = np.linspace(t[0], t[-1], len(t) - 1)  # "continuous" t values
+pregenerated_rand = [0 * rand(loc=0, scale=1, size=(len(Q))) for i in tcont]
 
 sensor = PosMeas(R, planar=True)
-propagator = KeplerMass(Q, G, planar=True)
+propagator = Kepler(Q, G, mu, planar=True)
 
-P0 = np.diag([1**2, 1**2, 1e-1**2, 1e-1**2, 1e3**2])
+P0 = np.diag([1**2, 1**2, 1e-1**2, 1e-1**2])
 xhat0 = np.random.multivariate_normal(x0, P0)
-xhat0[-1] = mu - 5e2
 
-ekf = UnscentedKalmanFilter(
-    sensor, propagator, xhat0, P0, alpha=1e-10, beta=2, kappa=1e12
-)
+ekf = UnscentedKalmanFilter(sensor, propagator, xhat0, P0, alpha=1e-4, beta=2, kappa=0)
 
 # get truth and measurements
 truth = propagator.get_truth(x0, t, (pregenerated_rand, tcont))
@@ -91,17 +85,17 @@ plt.axis("equal")
 plt.legend()
 plt.title("Cartesian State")
 
-fig, ax = plt.subplots(3, 2, layout="constrained")
+fig, ax = plt.subplots(2, 2, layout="constrained")
 fig.suptitle("Covariance Analysis")
 params = ["x", "y", "v_x", "v_y", "mu"]
 symbols = params
-units = ["km", "km", "km/s", "km/s", "prop err"]
-for i in range(5):
+units = ["km", "km", "km/s", "km/s"]
+for i in range(4):
     ax[i // 2, i % 2].step(
         t, bars[:, i], "-r", lw=1, alpha=0.5, label="$\\pm3\\sigma$ Bounds"
     )
     ax[i // 2, i % 2].plot(t, -bars[:, i], "-r", lw=1, alpha=0.5)
-    ax[i // 2, i % 2].plot(t, err[:, i], label="$" + symbols[i] + "$ Error")
+    ax[i // 2, i % 2].scatter(t, err[:, i], label="$" + symbols[i] + "$ Error")
     ax[i // 2, i % 2].legend()
     ax[i // 2, i % 2].grid(True)
     ax[i // 2, i % 2].set_ylabel(
@@ -128,7 +122,7 @@ units = ["km", "km"]
 for i in range(2):
     ax[i].plot(t, innovbars[:, i], "-r", lw=1, alpha=0.5, label="$\\pm3\\sigma$ Bounds")
     ax[i].plot(t, -innovbars[:, i], "-r", lw=1, alpha=0.5)
-    ax[i].plot(t, epsilons[:, i], label="$" + symbols[i] + "$ Error")
+    ax[i].scatter(t, epsilons[:, i], label="$" + symbols[i] + "$ Error")
     ax[i].legend()
     ax[i].grid(True)
     ax[i].set_ylabel(

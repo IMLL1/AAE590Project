@@ -85,8 +85,8 @@ class UnscentedKalmanFilter(Filter):
         x0: npt.ArrayLike,
         P0: npt.ArrayLike,
         alpha: float = 1e-3,
-        kappa: float = 0,
         beta: float = 2,
+        kappa: float = 0,
     ):
         super().__init__(measModel, dynamicsModel, x0, P0)
 
@@ -95,7 +95,7 @@ class UnscentedKalmanFilter(Filter):
         self.kappa = kappa
         self.beta = beta
         self.n = len(self.x)
-        self.lam = self.alpha**2 * (self.n + self.kappa) - self.n
+        self.lam = ((self.alpha**2) * (self.n + self.kappa)) - self.n
 
         # define weights
         w0m = self.lam / (self.n + self.lam)
@@ -108,10 +108,10 @@ class UnscentedKalmanFilter(Filter):
         X0 = self.x
         chol = np.linalg.cholesky(self.P)
         X_stepm = [
-            self.x + np.sqrt(self.n + self.lam) * chol[:, i] for i in range(self.n)
+            self.x - np.sqrt(self.n + self.lam) * chol[:, i] for i in range(self.n)
         ]
         X_stepp = [
-            self.x - np.sqrt(self.n + self.lam) * chol[:, i] for i in range(self.n)
+            self.x + np.sqrt(self.n + self.lam) * chol[:, i] for i in range(self.n)
         ]
         X = [X0, *X_stepm, *X_stepp]
         return X
@@ -125,17 +125,23 @@ class UnscentedKalmanFilter(Filter):
         Xk = [self.dynamicsModel.propagate_x(t, X, dt, noise_t_vec) for X in Xkm1]
         self.x = np.sum([self.wm[i] * Xk[i] for i in range(1 + 2 * self.n)], axis=0)
         self.P = (
-            np.sum(
+            sum(
                 [
                     self.wc[i] * np.outer((Xk[i] - self.x), (Xk[i] - self.x))
                     for i in range(1 + 2 * self.n)
-                ],
-                axis=0,
+                ]
             )
             + G @ Q @ G.T
         )
         self.P = (self.P + self.P.T) / 2
 
+        # import matplotlib.pyplot as plt
+
+        # pts = np.random.multivariate_normal(self.x, self.P, 1000)
+
+        # plt.scatter(pts[:, 0], pts[:, 1], c="r")
+        # plt.scatter(np.array(Xk)[:, 0], np.array(Xk)[:, 1], c="b")
+        # plt.show()
         return self.x, self.P
 
     def update(self, z, t):
@@ -144,19 +150,18 @@ class UnscentedKalmanFilter(Filter):
         # Z sigma points
         Zsp = [self.measModel.get_measurement(t, X) for X in Xsp]
         zhat = np.sum([self.wm[i] * Zsp[i] for i in range(1 + 2 * self.n)], axis=0)
-        Pz = np.sum(
+        Pz = sum(
             [
                 self.wc[i] * np.outer((Zsp[i] - zhat), (Zsp[i] - zhat))
                 for i in range(1 + 2 * self.n)
-            ],
-            axis=0,
+            ]
         ) + self.measModel.get_R(t, self.x)
-        Pxz = np.sum(
+        Pxz = sum(
             [
+                # self.wc[i] * np.outer((Xsp[i] - self.x), (Zsp[i] - zhat))
                 self.wc[i] * np.outer((Xsp[i] - self.x), (Zsp[i] - zhat))
                 for i in range(1 + 2 * self.n)
-            ],
-            axis=0,
+            ]
         )
         K = np.atleast_2d(np.linalg.solve(Pz.T, Pxz.T).T)
         y = z - zhat
@@ -167,7 +172,6 @@ class UnscentedKalmanFilter(Filter):
         return self.x, self.P, Pz, y
 
 
-# UKF uses SUT
 class CubatureKalmanFilter(Filter):
     def __init__(
         self,

@@ -45,6 +45,20 @@ class DynamicsModel:
         return xk
 
 
+class Linear(DynamicsModel):
+    def __init__(self, Q, G, A, planar=False):
+        super().__init__(Q, G, planar)
+        self.A = A
+
+    def get_deriv(self, t, x, noise_t_vec=()):
+        dx = self.A @ x
+
+        if len(noise_t_vec) == 2:  # if noise
+            dx += add_noise(self, t, x, noise_t_vec[0], noise_t_vec[1])
+
+        return dx
+
+
 class Kepler(DynamicsModel):
     def __init__(self, Q, G, mu, planar=False):
         super().__init__(Q, G, planar)

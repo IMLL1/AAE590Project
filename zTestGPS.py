@@ -22,12 +22,12 @@ R = np.diag([0.003] * 24)
 
 # x0 = [6750, 0, 0, 0, 6, 8]
 x0 = [6450, 0, 0, 0, 4, 6]
-P0 = np.diag([*[0.1**2] * 3, *[0.1**2] * 3, 1e3**2])
+P0 = np.diag([*[0.01**2] * 3, *[0.01**2] * 3, 1e2**2])
 
 case = r"EKF/Pos Measurement/$\mu$ Estimation"
 
 dt = 60
-propTime = 60 * 60 * 5
+propTime = 60 * 60 * 0.5
 
 
 # %% setup
@@ -45,6 +45,7 @@ sensor = WalkerPseudorange(R, np.rad2deg(55), 24, 6, 20, 20180, planar=False)
 propagator = KeplerMass(Q, G, planar=False)
 
 xhat0 = np.random.multivariate_normal(x0, P0)
+xhat0[-1] = mu * 1.00001
 
 kf = ExtendedKalmanFilter(sensor, propagator, xhat0, P0)
 
@@ -90,45 +91,48 @@ truth = np.array(truth)
 # do the same thing to xcont to compare
 err = xhat - truth
 bars = 3 * np.sqrt(np.array([np.diag(P) for P in Pp]))
+err[:, :6] *= 1e3
+bars[:, :6] *= 1e3
 
-epsilons = np.array(epsilons)
-innovbars = 3 * np.sqrt(np.array([np.diag(W) for W in Ws]))
+epsilons = 1e3 * np.array(epsilons)
+innovbars = 1e3 * 3 * np.sqrt(np.array([np.diag(W) for W in Ws]))
 
 # %% analysis
-# plt.rcParams.update({"text.usetex": True, "font.family": "Computer Modern"})
+plt.rcParams.update({"text.usetex": True, "font.family": "Computer Modern"})
 
-# fig, ax = plt.subplots(3, 3, layout="tight")
-# fig.suptitle("Covariance Analysis\n" + case)
-# params = [r"$x$", r"$y$", r"$z$", r"$v_x$", r"$v_y$", r"$v_z$", r"$\mu$"]
-# units = [*["km"] * 3, *["km/s"] * 3, r"km$^3$/s$^2$"]
-# for i in range(len(params)):
-#     ax[i // 3, i % 3].plot(t, err[:, i])
-#     ax[i // 3, i % 3].step(t, bars[:, i], "-r", lw=1, alpha=0.5)
-#     ax[i // 3, i % 3].plot(t, -bars[:, i], "-r", lw=1, alpha=0.5)
-#     ax[i // 3, i % 3].grid(True)
-#     ax[i // 3, i % 3].set_title(params[i] + " [" + units[i] + "]")
-
-
-# fig.legend(ax[0][0].get_lines()[0:2], ["Error", r"$3\sigma$ Bounds"], loc=1)
-# fig.supxlabel(r"Time ($t$) [sec]")
-# fig.supylabel(r"Error ($e$) [plot-dependent]")
+fig, ax = plt.subplots(3, 3, layout="tight")
+fig.suptitle("Covariance Analysis\n" + case)
+params = [r"$x$", r"$y$", r"$z$", r"$v_x$", r"$v_y$", r"$v_z$", r"$\mu$"]
+units = [*["m"] * 3, *["m/s"] * 3, r"km$^3$/s$^2$"]
+for i in range(len(params)):
+    ax[i // 3, i % 3].plot(t, err[:, i])
+    ax[i // 3, i % 3].step(t, bars[:, i], "-r", lw=1, alpha=0.5)
+    ax[i // 3, i % 3].plot(t, -bars[:, i], "-r", lw=1, alpha=0.5)
+    ax[i // 3, i % 3].grid(True)
+    ax[i // 3, i % 3].set_title(params[i] + " [" + units[i] + "]")
 
 
-# fig, ax = plt.subplots(3, 1, layout="tight")
-# fig.suptitle("Measurement Residuals Analysis\n" + case)
-# params = [r"$x$", r"$y$", r"$z$"]
-# units = [*["km"] * 3]
-# for i in range(len(params)):
-#     ax[i].plot(t, err[:, i])
-#     ax[i].step(t, bars[:, i], "-r", lw=1, alpha=0.5)
-#     ax[i].plot(t, -bars[:, i], "-r", lw=1, alpha=0.5)
-#     ax[i].grid(True)
-#     ax[i].set_title(params[i] + " [" + units[i] + "]")
+fig.legend(ax[0][0].get_lines()[0:2], ["Error", r"$3\sigma$ Bounds"], loc=1)
+fig.supxlabel(r"Time ($t$) [sec]")
+fig.supylabel(r"Error ($e$) [plot-dependent]")
 
 
-# fig.legend(ax[-1].get_lines()[0:2], ["Residual", r"$3\sigma$ Bounds"], loc=1)
-# fig.supxlabel(r"Time ($t$) [sec]")
-# fig.supylabel(r"Measurement Residual ($e$) [plot-dependent]")
+fig, ax = plt.subplots(6, 4)
+fig.suptitle("Pseudorange Residuals Analysis\n" + case)
+params = [r"$\rho_{" + str(i + 1) + r"}$" for i in range(24)]
+units = [*["m"] * 24]
+for i in range(len(params)):
+    ax[i // 4, i % 4].plot(t, epsilons[:, i])
+    ax[i // 4, i % 4].step(t, innovbars[:, i], "-r", lw=1, alpha=0.5)
+    ax[i // 4, i % 4].plot(t, -innovbars[:, i], "-r", lw=1, alpha=0.5)
+    ax[i // 4, i % 4].grid(True)
+    ax[i // 4, i % 4].set_title(params[i] + " [" + units[i] + "]")
+
+
+fig.legend(ax.flatten()[0].get_lines()[0:2], ["Residual", r"$3\sigma$ Bounds"], loc=1)
+fig.supxlabel(r"Time ($t$) [sec]")
+fig.supylabel(r"Measurement Residual ($e$) [plot-dependent]")
+plt.tight_layout(w_pad=-1, h_pad=-0.5, pad=0.25)
 
 
 plt.show()
