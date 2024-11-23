@@ -34,10 +34,11 @@ pregenerated_rand = [0 * rand(loc=0, scale=1, size=(len(Q))) for i in tcont]
 sensor = PosMeas(R, planar=True)
 propagator = Kepler(Q, G, mu, planar=True)
 
-P0 = np.diag([1**2, 1**2, 1e-1**2, 1e-1**2])
-xhat0 = np.random.multivariate_normal(x0, P0)
+P0 = np.diag([0.05**2, 0.05**2, 1e-2**2, 1e-2**2])
+xhat0 = x0  # np.random.multivariate_normal(x0, P0)
 
 ekf = UnscentedKalmanFilter(sensor, propagator, xhat0, P0, alpha=1e-4, beta=2, kappa=0)
+# ckf = CubatureKalmanFilter(sensor, propagator, xhat0, P0)
 
 # get truth and measurements
 truth = propagator.get_truth(x0, t, (pregenerated_rand, tcont))
@@ -95,7 +96,7 @@ for i in range(4):
         t, bars[:, i], "-r", lw=1, alpha=0.5, label="$\\pm3\\sigma$ Bounds"
     )
     ax[i // 2, i % 2].plot(t, -bars[:, i], "-r", lw=1, alpha=0.5)
-    ax[i // 2, i % 2].scatter(t, err[:, i], label="$" + symbols[i] + "$ Error")
+    ax[i // 2, i % 2].scatter(t, err[:, i], s=1, label="$" + symbols[i] + "$ Error")
     ax[i // 2, i % 2].legend()
     ax[i // 2, i % 2].grid(True)
     ax[i // 2, i % 2].set_ylabel(
@@ -122,7 +123,7 @@ units = ["km", "km"]
 for i in range(2):
     ax[i].plot(t, innovbars[:, i], "-r", lw=1, alpha=0.5, label="$\\pm3\\sigma$ Bounds")
     ax[i].plot(t, -innovbars[:, i], "-r", lw=1, alpha=0.5)
-    ax[i].scatter(t, epsilons[:, i], label="$" + symbols[i] + "$ Error")
+    ax[i].scatter(t, epsilons[:, i], s=1, label="$" + symbols[i] + "$ Error")
     ax[i].legend()
     ax[i].grid(True)
     ax[i].set_ylabel(
