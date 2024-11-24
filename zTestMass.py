@@ -25,14 +25,14 @@ R = np.diag([1e-2**2, 1e-2**2])
 # continuous and discrete dt
 
 mu = 3.9861e5  # km3/s2
-x0 = [6750, 0, 0, 10]
+x0 = np.array([6750, 0, 0, 10])
 
-x0 = [*x0, mu]
+x0 = np.array([*x0, mu])
 nx = len(x0)
 
 t = np.arange(0, 10 * 60 * 60, 60)  # sec
 tcont = np.linspace(t[0], t[-1], 25 * len(t) - 1)  # "continuous" t values
-pregenerated_rand = [0 * rand(loc=0, scale=1, size=(4)) for i in tcont]
+# pregenerated_rand = [rand(loc=0, scale=1, size=(4)) for i in tcont]
 
 sensor = PosMeas(R, planar=True)
 propagator = KeplerMass(Q, G, planar=True)
@@ -41,12 +41,10 @@ P0 = np.diag([1**2, 1**2, 1e-1**2, 1e-1**2, 1e3**2])
 xhat0 = np.random.multivariate_normal(x0, P0)
 xhat0[-1] = mu - 5e2
 
-ekf = UnscentedKalmanFilter(
-    sensor, propagator, xhat0, P0, alpha=1e-10, beta=2, kappa=1e12
-)
+ekf = UnscentedKalmanFilter(sensor, propagator, xhat0, P0)
 
 # get truth and measurements
-truth = propagator.get_truth(x0, t, (pregenerated_rand, tcont))
+truth = propagator.get_truth(x0, t, disc_noise=True)
 z = np.array([sensor.get_measurement(t[k], truth[k], True) for k in range(len(t))])
 
 xhatm = []  # all prior state estiamtes

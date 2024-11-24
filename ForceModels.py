@@ -4,7 +4,7 @@ from scipy.optimize import approx_fprime
 import numpy as np
 
 
-def add_noise(dynamics, t, x, noisevec, tvec):
+def add_continuous_noise(dynamics, t, x, noisevec, tvec):
     idx = np.abs(t - tvec).argmin()
     Qsqrt = np.linalg.cholesky(dynamics.get_Q(t, x))
     w = Qsqrt @ noisevec[idx]
@@ -31,17 +31,29 @@ class DynamicsModel:
     def get_deriv(self, t, x, noise_t_vec=()):
         dx = np.zeros_like(x)
         if len(noise_t_vec) == 2:  # if noise
-            dx += add_noise(self, t, x, noise_t_vec[0], noise_t_vec[1])
+            dx += add_continuous_noise(self, t, x, noise_t_vec[0], noise_t_vec[1])
         return dx
 
-    def propagate_x(self, t, x, dt, noise_t_vec=()):
+    def propagate_x(self, t, x, dt, disc_noise=False, noise_t_vec=()):
+        assert not (disc_noise and (len(noise_t_vec) > 0))
         f = lambda t, x: self.get_deriv(t, x, noise_t_vec)
         x1 = solve_ivp(f, [t, t + dt], x, t_eval=[t + dt]).y.flatten()
+        if disc_noise:
+            x1 += self.G @ mvrn(np.zeros(np.size(self.G, 1)), self.get_Q(t, x))
         return x1
 
-    def get_truth(self, x0, tk, noise_t_vec=()):
-        f = lambda t, x: self.get_deriv(t, x, noise_t_vec)
-        xk = list(solve_ivp(f, [tk[0], tk[-1]], x0, t_eval=tk).y.T)
+    def get_truth(self, x0, tk, disc_noise=False, noise_t_vec=()):
+        x0 = np.array(x0)
+        assert not (disc_noise and (len(noise_t_vec) > 0))
+        if disc_noise:
+            xk = [x0]
+            dt = tk[1] - tk[0]
+            for i in range(len(tk) - 1):
+                t = tk[i]
+                xk.append(self.propagate_x(t, xk[-1], dt, disc_noise=disc_noise))
+        else:
+            f = lambda t, x: self.get_deriv(t, x, noise_t_vec)
+            xk = list(solve_ivp(f, [tk[0], tk[-1]], x0, t_eval=tk).y.T)
         return xk
 
 
@@ -54,7 +66,7 @@ class Linear(DynamicsModel):
         dx = self.A @ x
 
         if len(noise_t_vec) == 2:  # if noise
-            dx += add_noise(self, t, x, noise_t_vec[0], noise_t_vec[1])
+            dx += add_continuous_noise(self, t, x, noise_t_vec[0], noise_t_vec[1])
 
         return dx
 
@@ -73,7 +85,7 @@ class Kepler(DynamicsModel):
         dx[:6] = np.array([*dpos, *accel])
 
         if len(noise_t_vec) == 2:  # if noise
-            dx += add_noise(self, t, x, noise_t_vec[0], noise_t_vec[1])
+            dx += add_continuous_noise(self, t, x, noise_t_vec[0], noise_t_vec[1])
 
         return dx
 
@@ -95,7 +107,7 @@ class KeplerPerurbed(DynamicsModel):
         dx[:end] = np.array([*dpos, *accel])
 
         if len(noise_t_vec) == 2:  # if noise
-            dx += add_noise(self, t, x, noise_t_vec[0], noise_t_vec[1])
+            dx += add_continuous_noise(self, t, x, noise_t_vec[0], noise_t_vec[1])
 
         return dx
 
@@ -116,6 +128,6 @@ class KeplerMass(DynamicsModel):
         dx[:end] = np.array([*dpos, *accel])
 
         if len(noise_t_vec) == 2:  # if noise
-            dx += add_noise(self, t, x, noise_t_vec[0], noise_t_vec[1])
+            dx += add_continuous_noise(self, t, x, noise_t_vec[0], noise_t_vec[1])
 
         return dx

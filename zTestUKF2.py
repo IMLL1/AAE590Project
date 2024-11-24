@@ -12,7 +12,7 @@ np.random.seed(0)
 ######################### problem-specific functions #########################
 
 
-Q = np.diag([1e-3, 1e-3, 1e-5, 1e-5]) ** 2
+Q = np.diag([1e-3, 1e-3, 1e-4, 1e-4]) ** 2
 
 
 G = np.identity(4)
@@ -29,7 +29,7 @@ nx = len(x0)
 
 t = np.arange(0, 0.25 * 60 * 60, 10)  # sec
 tcont = np.linspace(t[0], t[-1], len(t) - 1)  # "continuous" t values
-pregenerated_rand = [0 * rand(loc=0, scale=1, size=(len(Q))) for i in tcont]
+# pregenerated_rand = [0 * rand(loc=0, scale=1, size=(len(Q))) for i in tcont]
 
 sensor = PosMeas(R, planar=True)
 propagator = Kepler(Q, G, mu, planar=True)
@@ -41,7 +41,7 @@ ekf = UnscentedKalmanFilter(sensor, propagator, xhat0, P0, alpha=1e-4, beta=2, k
 # ckf = CubatureKalmanFilter(sensor, propagator, xhat0, P0)
 
 # get truth and measurements
-truth = propagator.get_truth(x0, t, (pregenerated_rand, tcont))
+truth = propagator.get_truth(x0, t, disc_noise=True)
 z = np.array([sensor.get_measurement(t[k], truth[k], True) for k in range(len(t))])
 
 xhatm = []  # all prior state estiamtes

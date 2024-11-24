@@ -5,8 +5,6 @@ import numpy.typing as npt
 from scipy.integrate import solve_ivp
 from numpy.random import multivariate_normal as mvrn
 
-# TODO: add noise to force model propagation
-
 
 class Filter:
     def __init__(
@@ -15,8 +13,6 @@ class Filter:
         dynamicsModel: DynamicsModel,
         x0: npt.ArrayLike,
         P0: npt.ArrayLike,
-        # noise_vec: npt.ArrayLike,
-        # t_vec: npt.ArrayLike,
     ):
         self.measModel = measModel
         self.dynamicsModel = dynamicsModel
@@ -24,11 +20,8 @@ class Filter:
         self.P = np.array(P0)
         self.n = len(self.x)
         assert np.shape(self.P) == (self.n, self.n)
-        # self.noise_vec = noise_vec
-        # self.t_vec = t_vec
-        # assert len(noise_vec) == len(t_vec)
 
-    def propagate(self, t, dt, noise_t_vec=()):
+    def propagate(self, t, dt, disc_noise=False, noise_t_vec=()):
         return NotImplementedError()
 
     def update(self, z, t):
@@ -36,6 +29,55 @@ class Filter:
 
 
 class ExtendedKalmanFilter(Filter):
+    def __init__(self, measModel, dynamicsModel, x0, P0):
+        super().__init__(measModel, dynamicsModel, x0, P0)
+        print("Using EKF, Q is continuous!\n")
+
+    def propagate(self, t, dt, noise_t_vec=()):
+        sv0 = np.array([*self.x, *self.P.flatten()])
+        nx = len(self.x)
+
+        def joint_DE(t, sv):
+            x = sv[:nx]
+            P = np.reshape(sv[nx:], (nx, nx))
+            F = self.dynamicsModel.get_F(t, x)
+            Q = self.dynamicsModel.get_Q(t, x)
+            dx = self.dynamicsModel.get_deriv(t, x, noise_t_vec)
+            G = self.dynamicsModel.G
+            dP = F @ P + P @ F.T + G @ Q @ G.T
+            return np.array([*dx, *dP.flatten()])
+
+        sv = solve_ivp(
+            joint_DE,
+            [t, t + dt],
+            sv0,
+            t_eval=[t + dt],
+        ).y.flatten()
+        self.x = sv[:nx]
+        self.P = np.reshape(sv[nx:], (nx, nx))
+        self.P = (self.P + self.P.T) / 2
+
+        return self.x, self.P
+
+    def update(self, z, t):
+        H = self.measModel.get_H(t, self.x)
+        W = H @ self.P @ H.T + self.measModel.get_R(t, self.x)
+        C = self.P @ H.T
+        K = np.atleast_2d(np.linalg.solve(W.T, C.T).T)
+        zhat = self.measModel.get_measurement(t, self.x)
+        y = z - zhat
+        self.x = self.x + K @ y
+        self.P = self.P - C @ K.T - K @ C.T + K @ W @ K.T
+        self.P = (self.P + self.P.T) / 2
+
+        return self.x, self.P, W, y
+
+
+class ExtendedKalmanFilterContinuous(Filter):
+    def __init__(self, measModel, dynamicsModel, x0, P0):
+        super().__init__(measModel, dynamicsModel, x0, P0)
+        print("Using continoous EKF, Q is continuous!\n")
+
     def propagate(self, t, dt, noise_t_vec=()):
         sv0 = np.array([*self.x, *self.P.flatten()])
         nx = len(self.x)
@@ -116,13 +158,13 @@ class UnscentedKalmanFilter(Filter):
         X = [X0, *X_stepm, *X_stepp]
         return X
 
-    def propagate(self, t, dt, noise_t_vec=()):
+    def propagate(self, t, dt, noise=False):
         Q = self.dynamicsModel.get_Q(t, self.x)
         G = self.dynamicsModel.G
         # sigma points
         Xkm1 = self.get_sigmapoints()
         # propagated sigma points
-        Xk = [self.dynamicsModel.propagate_x(t, X, dt, noise_t_vec) for X in Xkm1]
+        Xk = [self.dynamicsModel.propagate_x(t, X, dt, disc_noise=noise) for X in Xkm1]
         self.x = np.sum([self.wm[i] * Xk[i] for i in range(1 + 2 * self.n)], axis=0)
         self.P = (
             sum(
@@ -192,13 +234,13 @@ class CubatureKalmanFilter(Filter):
         X = [self.x + chol @ self.xi[:, i] for i in range(2 * self.n)]
         return X
 
-    def propagate(self, t, dt, noise_t_vec=()):
+    def propagate(self, t, dt, noise=False):
         Q = self.dynamicsModel.get_Q(t, self.x)
         G = self.dynamicsModel.G
         # sigma points
         Xkm1 = self.get_sigmapoints()
         # propagated sigma points
-        Xk = [self.dynamicsModel.propagate_x(t, X, dt, noise_t_vec) for X in Xkm1]
+        Xk = [self.dynamicsModel.propagate_x(t, X, dt, disc_noise=noise) for X in Xkm1]
         self.x = sum(Xk) / (2 * self.n)
         self.P = (
             sum(
