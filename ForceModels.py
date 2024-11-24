@@ -28,6 +28,13 @@ class DynamicsModel:
             F = np.atleast_2d(F)
         return F
 
+    def get_STM(self, t, x, dt):
+        f = lambda state: self.propagate_x(t, state, dt)
+        F = np.atleast_2d(approx_fprime(x, f))
+        if len(np.shape(F)) == 1:
+            F = np.atleast_2d(F)
+        return F
+
     def get_deriv(self, t, x, noise_t_vec=()):
         dx = np.zeros_like(x)
         if len(noise_t_vec) == 2:  # if noise

@@ -21,41 +21,24 @@ class Filter:
         self.n = len(self.x)
         assert np.shape(self.P) == (self.n, self.n)
 
-    def propagate(self, t, dt, disc_noise=False, noise_t_vec=()):
+    def propagate(self, t, dt):
         return NotImplementedError()
 
     def update(self, z, t):
         return NotImplementedError()
 
 
-class ExtendedKalmanFilter(Filter):
+class LinearKalmanFilter(Filter):
     def __init__(self, measModel, dynamicsModel, x0, P0):
         super().__init__(measModel, dynamicsModel, x0, P0)
-        print("Using EKF, Q is continuous!\n")
 
-    def propagate(self, t, dt, noise_t_vec=()):
-        sv0 = np.array([*self.x, *self.P.flatten()])
-        nx = len(self.x)
+    def propagate(self, t, dt):
+        G = self.dynamicsModel.G
+        Q = self.dynamicsModel.get_Q(t, self.x)
+        STM = self.dynamicsModel.get_STM(t, self.x, dt)
+        self.x = STM @ self.x
 
-        def joint_DE(t, sv):
-            x = sv[:nx]
-            P = np.reshape(sv[nx:], (nx, nx))
-            F = self.dynamicsModel.get_F(t, x)
-            Q = self.dynamicsModel.get_Q(t, x)
-            dx = self.dynamicsModel.get_deriv(t, x, noise_t_vec)
-            G = self.dynamicsModel.G
-            dP = F @ P + P @ F.T + G @ Q @ G.T
-            return np.array([*dx, *dP.flatten()])
-
-        sv = solve_ivp(
-            joint_DE,
-            [t, t + dt],
-            sv0,
-            t_eval=[t + dt],
-        ).y.flatten()
-        self.x = sv[:nx]
-        self.P = np.reshape(sv[nx:], (nx, nx))
-        self.P = (self.P + self.P.T) / 2
+        self.P = STM @ self.P @ STM.T + G @ Q @ G.T
 
         return self.x, self.P
 
@@ -73,34 +56,17 @@ class ExtendedKalmanFilter(Filter):
         return self.x, self.P, W, y
 
 
-class ExtendedKalmanFilterContinuous(Filter):
+class ExtendedKalmanFilter(Filter):
     def __init__(self, measModel, dynamicsModel, x0, P0):
         super().__init__(measModel, dynamicsModel, x0, P0)
-        print("Using continoous EKF, Q is continuous!\n")
 
-    def propagate(self, t, dt, noise_t_vec=()):
-        sv0 = np.array([*self.x, *self.P.flatten()])
-        nx = len(self.x)
+    def propagate(self, t, dt):
+        G = self.dynamicsModel.G
+        Q = self.dynamicsModel.get_Q(t, self.x)
+        STM = self.dynamicsModel.get_STM(t, self.x, dt)
+        self.x = self.dynamicsModel.propagate_x(t, self.x, dt)
 
-        def joint_DE(t, sv):
-            x = sv[:nx]
-            P = np.reshape(sv[nx:], (nx, nx))
-            F = self.dynamicsModel.get_F(t, x)
-            Q = self.dynamicsModel.get_Q(t, x)
-            dx = self.dynamicsModel.get_deriv(t, x, noise_t_vec)
-            G = self.dynamicsModel.G
-            dP = F @ P + P @ F.T + G @ Q @ G.T
-            return np.array([*dx, *dP.flatten()])
-
-        sv = solve_ivp(
-            joint_DE,
-            [t, t + dt],
-            sv0,
-            t_eval=[t + dt],
-        ).y.flatten()
-        self.x = sv[:nx]
-        self.P = np.reshape(sv[nx:], (nx, nx))
-        self.P = (self.P + self.P.T) / 2
+        self.P = STM @ self.P @ STM.T + G @ Q @ G.T
 
         return self.x, self.P
 
@@ -158,13 +124,13 @@ class UnscentedKalmanFilter(Filter):
         X = [X0, *X_stepm, *X_stepp]
         return X
 
-    def propagate(self, t, dt, noise=False):
+    def propagate(self, t, dt):
         Q = self.dynamicsModel.get_Q(t, self.x)
         G = self.dynamicsModel.G
         # sigma points
         Xkm1 = self.get_sigmapoints()
         # propagated sigma points
-        Xk = [self.dynamicsModel.propagate_x(t, X, dt, disc_noise=noise) for X in Xkm1]
+        Xk = [self.dynamicsModel.propagate_x(t, X, dt) for X in Xkm1]
         self.x = np.sum([self.wm[i] * Xk[i] for i in range(1 + 2 * self.n)], axis=0)
         self.P = (
             sum(
@@ -234,13 +200,13 @@ class CubatureKalmanFilter(Filter):
         X = [self.x + chol @ self.xi[:, i] for i in range(2 * self.n)]
         return X
 
-    def propagate(self, t, dt, noise=False):
+    def propagate(self, t, dt):
         Q = self.dynamicsModel.get_Q(t, self.x)
         G = self.dynamicsModel.G
         # sigma points
         Xkm1 = self.get_sigmapoints()
         # propagated sigma points
-        Xk = [self.dynamicsModel.propagate_x(t, X, dt, disc_noise=noise) for X in Xkm1]
+        Xk = [self.dynamicsModel.propagate_x(t, X, dt) for X in Xkm1]
         self.x = sum(Xk) / (2 * self.n)
         self.P = (
             sum(
@@ -275,3 +241,48 @@ class CubatureKalmanFilter(Filter):
         self.P = (self.P + self.P.T) / 2
 
         return self.x, self.P, Pz, y
+
+
+# class ExtendedKalmanFilterContinuous(Filter):
+#     def __init__(self, measModel, dynamicsModel, x0, P0):
+#         super().__init__(measModel, dynamicsModel, x0, P0)
+#         print("Using continoous EKF, Q is continuous!\n")
+
+#     def propagate(self, t, dt, noise_t_vec=()):
+#         sv0 = np.array([*self.x, *self.P.flatten()])
+#         nx = len(self.x)
+
+#         def joint_DE(t, sv):
+#             x = sv[:nx]
+#             P = np.reshape(sv[nx:], (nx, nx))
+#             F = self.dynamicsModel.get_F(t, x)
+#             Q = self.dynamicsModel.get_Q(t, x)
+#             dx = self.dynamicsModel.get_deriv(t, x, noise_t_vec)
+#             G = self.dynamicsModel.G
+#             dP = F @ P + P @ F.T + G @ Q @ G.T
+#             return np.array([*dx, *dP.flatten()])
+
+#         sv = solve_ivp(
+#             joint_DE,
+#             [t, t + dt],
+#             sv0,
+#             t_eval=[t + dt],
+#         ).y.flatten()
+#         self.x = sv[:nx]
+#         self.P = np.reshape(sv[nx:], (nx, nx))
+#         self.P = (self.P + self.P.T) / 2
+
+#         return self.x, self.P
+
+#     def update(self, z, t):
+#         H = self.measModel.get_H(t, self.x)
+#         W = H @ self.P @ H.T + self.measModel.get_R(t, self.x)
+#         C = self.P @ H.T
+#         K = np.atleast_2d(np.linalg.solve(W.T, C.T).T)
+#         zhat = self.measModel.get_measurement(t, self.x)
+#         y = z - zhat
+#         self.x = self.x + K @ y
+#         self.P = self.P - C @ K.T - K @ C.T + K @ W @ K.T
+#         self.P = (self.P + self.P.T) / 2
+
+#         return self.x, self.P, W, y

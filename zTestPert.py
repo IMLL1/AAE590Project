@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from numpy.random import normal as rand
-from Filters import UKF
+from Filters import *
 from ForceModels import KeplerPerurbed
 from MeasModels import PosMeas
 from tqdm import tqdm
@@ -18,7 +18,7 @@ def Q(t, x):
 
 
 G = np.array([[0, 0], [0, 0], [1, 0], [0, 1], [0, 0], [0, 0]])
-R = np.diag([1e-2, 1e-2])
+R = np.diag([1e-2, 1e-2]) ** 2
 
 
 ######################### problem-specific functions #########################
@@ -33,19 +33,19 @@ nx = len(x0)
 
 t = np.arange(0, 10 * 60 * 60, 60)  # sec
 tcont = np.linspace(t[0], t[-1], 25 * len(t) - 1)  # "continuous" t values
-pregenerated_rand = [rand(loc=0, scale=1, size=(2)) for i in tcont]
+# pregenerated_rand = [rand(loc=0, scale=1, size=(2)) for i in tcont]
 
 sensor = PosMeas(R, planar=True)
 propagator = KeplerPerurbed(Q, G, mu, pert_vec, planar=True)
 
-P0 = np.diag([0.05**2, 0.05**2, 5e-3**2, 5e-3**2, 50e-5**2, 50e-5**2])
+P0 = np.diag([0.05**2, 0.05**2, 5e-3**2, 5e-3**2, 1e-5**2, 1e-5**2])
 xhat0 = np.random.multivariate_normal(x0, P0)
 xhat0[4:] = 0
 
-ekf = UKF(sensor, propagator, xhat0, P0, alpha=1e-6, beta=1e4)
+ekf = CubatureKalmanFilter(sensor, propagator, xhat0, P0)
 
 # get truth and measurements
-truth = propagator.get_truth(x0, t, (pregenerated_rand, tcont))
+truth = propagator.get_truth(x0, t, disc_noise=True)
 z = np.array([sensor.get_measurement(t[k], truth[k], True) for k in range(len(t))])
 
 xhatm = []  # all prior state estiamtes

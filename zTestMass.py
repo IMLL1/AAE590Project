@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from numpy.random import normal as rand
-from Filters import UnscentedKalmanFilter
+from Filters import ExtendedKalmanFilter
 from ForceModels import KeplerMass
 from MeasModels import PosMeas
 from tqdm import tqdm
@@ -12,39 +12,41 @@ np.random.seed(0)
 ######################### problem-specific functions #########################
 
 
-def Q(t, x):
-    rmag = np.linalg.norm(x[:2] / 6500)
-    return (np.diag([*[1e-3] * 2, *[0.1e-3] * 2]) / rmag) ** 2
+# def Q(t, x):
+#     rmag = np.linalg.norm(x[:2] / 6500)
+#     return np.array([[0.1e-3**2, 0], [0, 0.1e-3**2]]) / rmag
+
+Q = np.array([[0.1e-3**2, 0], [0, 0.1e-3**2]])
 
 
-G = np.vstack((np.identity(4), [0, 0, 0, 0]))
-R = np.diag([1e-2**2, 1e-2**2])
+G = np.array([[0, 0], [0, 0], [1, 0], [0, 1], [0, 0]])
+R = np.diag([1e-1**2, 1e-1**2])
 
 
 ######################### problem-specific functions #########################
 # continuous and discrete dt
 
 mu = 3.9861e5  # km3/s2
-x0 = np.array([6750, 0, 0, 10])
+x0 = [6750, 0, 0, 10]
 
-x0 = np.array([*x0, mu])
+x0 = [*x0, mu]
 nx = len(x0)
 
 t = np.arange(0, 10 * 60 * 60, 60)  # sec
-tcont = np.linspace(t[0], t[-1], 25 * len(t) - 1)  # "continuous" t values
-# pregenerated_rand = [rand(loc=0, scale=1, size=(4)) for i in tcont]
+tcont = np.linspace(t[0], t[-1], 100 * len(t) - 1)  # "continuous" t values
+pregenerated_rand = [rand(loc=0, scale=1, size=(2)) for i in tcont]
 
 sensor = PosMeas(R, planar=True)
 propagator = KeplerMass(Q, G, planar=True)
 
-P0 = np.diag([1**2, 1**2, 1e-1**2, 1e-1**2, 1e3**2])
+P0 = np.diag([0.1**2, 0.1**2, 1e-2**2, 1e-2**2, 3e2**2])
 xhat0 = np.random.multivariate_normal(x0, P0)
-xhat0[-1] = mu - 5e2
+xhat0[-1] = mu + 1e2
 
-ekf = UnscentedKalmanFilter(sensor, propagator, xhat0, P0)
+ekf = ExtendedKalmanFilter(sensor, propagator, xhat0, P0)
 
 # get truth and measurements
-truth = propagator.get_truth(x0, t, disc_noise=True)
+truth = propagator.get_truth(x0, t, (pregenerated_rand, tcont))
 z = np.array([sensor.get_measurement(t[k], truth[k], True) for k in range(len(t))])
 
 xhatm = []  # all prior state estiamtes
@@ -91,7 +93,7 @@ plt.title("Cartesian State")
 
 fig, ax = plt.subplots(3, 2, layout="constrained")
 fig.suptitle("Covariance Analysis")
-params = ["x", "y", "v_x", "v_y", "mu"]
+params = ["x", "y", "v_x", "v_y", "\\mu"]
 symbols = params
 units = ["km", "km", "km/s", "km/s", "prop err"]
 for i in range(5):

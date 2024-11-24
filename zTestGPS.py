@@ -1,4 +1,5 @@
 import numpy as np
+import scipy as sp
 import matplotlib.pyplot as plt
 from numpy.random import normal as rand
 from Filters import *
@@ -14,11 +15,12 @@ np.random.seed(0)
 
 def Q(t, x):  # mostly drag
     rmag = np.linalg.norm(x[:2] / 6500)
-    return 0.1e-3**2 * np.identity(3) / rmag
+    I = np.identity(3)
+    return sp.linalg.block_diag(10e-3**2 * I / rmag, 0.1e-3**2 * I / rmag)
 
 
-G = np.block([np.zeros((3, 3)), np.identity(3), np.zeros((3, 1))]).T
-R = np.diag([0.003] * 24)
+G = np.block([np.identity(6), np.zeros((6, 1))]).T
+R = np.diag([0.01] * 24) ** 2
 
 # x0 = [6750, 0, 0, 0, 6, 8]
 x0 = [6450, 0, 0, 0, 4, 6]
@@ -36,8 +38,6 @@ propTime = 60 * 60 * 0.5
 mu = 3.9861e5  # km3/s2
 
 t = np.arange(0, propTime, dt)  # sec
-tcont = np.linspace(t[0], t[-1], 100 * len(t) - 1)  # "continuous" t values
-pregenerated_rand = [rand(loc=0, scale=1, size=(len(x0) // 2)) for i in tcont]
 
 x0 = [*x0, mu]
 nx = len(x0)
@@ -45,7 +45,6 @@ sensor = WalkerPseudorange(R, np.rad2deg(55), 24, 6, 20, 20180, planar=False)
 propagator = KeplerMass(Q, G, planar=False)
 
 xhat0 = np.random.multivariate_normal(x0, P0)
-xhat0[-1] = mu * 1.00001
 
 kf = ExtendedKalmanFilter(sensor, propagator, xhat0, P0)
 
@@ -58,7 +57,7 @@ kf = ExtendedKalmanFilter(sensor, propagator, xhat0, P0)
 # plt.show()
 
 # get truth and measurements
-truth = propagator.get_truth(x0, t, (pregenerated_rand, tcont))
+truth = propagator.get_truth(x0, t, disc_noise=True)
 z = np.array([sensor.get_measurement(t[k], truth[k], True) for k in range(len(t))])
 
 xhatm = []  # all prior state estiamtes
