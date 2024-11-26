@@ -46,7 +46,7 @@ propagator = KeplerMass(Q, G, planar=False)
 
 xhat0 = np.random.multivariate_normal(x0, P0)
 
-kf = ExtendedKalmanFilter(sensor, propagator, xhat0, P0)
+kf = UnscentedKalmanFilter(sensor, propagator, xhat0, P0)
 
 
 # fig = plt.figure()

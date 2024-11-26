@@ -118,7 +118,7 @@ class WalkerPseudorange(MeasurementModel):
         # generate position from walker
 
     def get_measurement(self, t, x, noise=False):
-        z = [np.linalg.norm(sat - x[:3]) for sat in self.pts]
+        z = np.array([np.linalg.norm(sat - x[:3]) for sat in self.pts])
         if noise:
             z += mvrn(np.zeros_like(z), self.get_R(t, x))
         return z

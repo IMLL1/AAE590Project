@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from numpy.random import normal as rand
-from Filters import ExtendedKalmanFilter
+from Filters import *
 from ForceModels import KeplerMass
 from MeasModels import PosMeas
 from tqdm import tqdm
@@ -32,7 +32,7 @@ x0 = [6750, 0, 0, 10]
 x0 = [*x0, mu]
 nx = len(x0)
 
-t = np.arange(0, 10 * 60 * 60, 60)  # sec
+t = np.arange(0, 10 * 60 * 60, 60 * 5)  # sec
 tcont = np.linspace(t[0], t[-1], 100 * len(t) - 1)  # "continuous" t values
 pregenerated_rand = [rand(loc=0, scale=1, size=(2)) for i in tcont]
 
@@ -43,10 +43,10 @@ P0 = np.diag([0.1**2, 0.1**2, 1e-2**2, 1e-2**2, 3e2**2])
 xhat0 = np.random.multivariate_normal(x0, P0)
 xhat0[-1] = mu + 1e2
 
-ekf = ExtendedKalmanFilter(sensor, propagator, xhat0, P0)
+ekf = UnscentedKalmanFilter(sensor, propagator, xhat0, P0)
 
 # get truth and measurements
-truth = propagator.get_truth(x0, t, (pregenerated_rand, tcont))
+truth = propagator.get_truth(x0, t, disc_noise=True)
 z = np.array([sensor.get_measurement(t[k], truth[k], True) for k in range(len(t))])
 
 xhatm = []  # all prior state estiamtes
@@ -78,8 +78,6 @@ truth = np.array(truth)
 # do the same thing to xcont to compare
 err = xhat - truth
 bars = 3 * np.sqrt(np.array([np.diag(P) for P in Pp]))
-err[:, -1] /= mu
-bars[:, -1] /= mu
 
 plt.figure()
 plt.plot(truth[:, 0], truth[:, 1], label="Truth", lw=1)
@@ -95,7 +93,7 @@ fig, ax = plt.subplots(3, 2, layout="constrained")
 fig.suptitle("Covariance Analysis")
 params = ["x", "y", "v_x", "v_y", "\\mu"]
 symbols = params
-units = ["km", "km", "km/s", "km/s", "prop err"]
+units = ["km", "km", "km/s", "km/s", "km^3/s^2"]
 for i in range(5):
     ax[i // 2, i % 2].step(
         t, bars[:, i], "-r", lw=1, alpha=0.5, label="$\\pm3\\sigma$ Bounds"
@@ -111,9 +109,9 @@ for i in range(5):
         + symbols[i]
         + "}-"
         + symbols[i]
-        + "$) ["
+        + "$) [$"
         + units[i]
-        + "]"
+        + "$]"
     )
     ax[i // 2, i % 2].set_xlabel("Time ($t$) [seconds]")
 
@@ -137,9 +135,9 @@ for i in range(2):
         + symbols[i]
         + "}-"
         + symbols[i]
-        + "$) ["
+        + "$) [$"
         + units[i]
-        + "]"
+        + "$]"
     )
 ax[1].set_xlabel("Time ($t$) [seconds]")
 
