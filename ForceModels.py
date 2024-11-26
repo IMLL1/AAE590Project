@@ -141,15 +141,19 @@ class KeplerMass(DynamicsModel):
 
 
 class CR3BP(DynamicsModel):
-    def __init__(self, Q, G, mu, planar=False):
+    def __init__(self, Q, G, mu, LU=1, TU=1, planar=False):
         super().__init__(Q, G, planar)
         self.mu = mu
+        self.LU = LU
+        self.TU = TU
         self.planar = planar
 
     def get_deriv(self, t, x, noise_t_vec=()):
-        X, Y = x[:2]
+        X, Y = x[:2] / self.LU
         VX, VY = x[2:4] if self.planar else x[3:5]
-        pos = x[:2] if self.planar else x[:3]
+        VX /= self.LU / self.TU
+        VY /= self.LU / self.TU
+        pos = x[:2] / self.LU if self.planar else x[:3] / self.LU
         P1 = np.array([-self.mu, 0]) if self.planar else np.array([-self.mu, 0, 0])
         P2 = np.array([1 - self.mu]) if self.planar else np.array([1 - self.mu, 0, 0])
         r1vec = pos - P1
@@ -165,6 +169,8 @@ class CR3BP(DynamicsModel):
         )
         ddpos += coriolis
 
+        ddpos *= self.LU / self.TU**2
+
         dx = np.zeros(4) if self.planar else np.zeros(6)
         velstart = 2 if self.planar else 3
         dx[:velstart] = x[velstart:]
@@ -176,15 +182,19 @@ class CR3BP(DynamicsModel):
 
 
 class CR3BPMassRatio(DynamicsModel):
-    def __init__(self, Q, G, planar=False):
+    def __init__(self, Q, G, LU=1, TU=1, planar=False):
         super().__init__(Q, G, planar)
+        self.LU = LU
+        self.TU = TU
         self.planar = planar
 
     def get_deriv(self, t, x, noise_t_vec=()):
         mu = x[-1]
-        X, Y = x[:2]
+        X, Y = x[:2] / self.LU
         VX, VY = x[2:4] if self.planar else x[3:5]
-        pos = x[:2] if self.planar else x[:3]
+        VX /= self.LU / self.TU
+        VY /= self.LU / self.TU
+        pos = x[:2] / self.LU if self.planar else x[:3] / self.LU
         P1 = np.array([-mu, 0]) if self.planar else np.array([-mu, 0, 0])
         P2 = np.array([1 - mu]) if self.planar else np.array([1 - mu, 0, 0])
         r1vec = pos - P1
@@ -200,10 +210,12 @@ class CR3BPMassRatio(DynamicsModel):
         )
         ddpos += coriolis
 
+        ddpos *= self.LU / self.TU**2
+
         dx = np.zeros(4) if self.planar else np.zeros(6)
         velstart = 2 if self.planar else 3
-        dx[:velstart] = x[velstart:]
-        dx[velstart:] = ddpos
+        dx[:velstart] = x[velstart : 2 * velstart]
+        dx[velstart : 2 * velstart] = ddpos
 
         if len(noise_t_vec) == 2:  # if noise
             dx += add_continuous_noise(self, t, x, noise_t_vec[0], noise_t_vec[1])
