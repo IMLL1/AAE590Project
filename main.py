@@ -12,7 +12,7 @@ np.random.seed(0)
 # %% Configurable
 
 mu = 3.9861e5  # km3/s2
-x0 = [6750, 0, 0, 0, 10, 0, mu]
+x0 = [6750, 0, 0, 0, 6, 8, mu]
 P0 = np.diag([*[0.1**2] * 3, *[0.1**2] * 3, 1e3**2])
 
 case = r"Pos Measurement/$\mu$ Estimation"
@@ -20,7 +20,7 @@ case = r"Pos Measurement/$\mu$ Estimation"
 dt = 60 * 5
 propTime = 60 * 60 * 24
 
-accel_sigma = 1e-4
+accel_sigma = 1e-6
 
 
 def Q(extradim):
@@ -127,5 +127,15 @@ fig.legend(ax.get_lines()[0:2], ["Residual", r"$3\sigma$ Bounds"], loc=1)
 fig.supxlabel(r"Time ($t$) [sec]")
 fig.supylabel(r"Measurement Residual ($e$) [plot-dependent]")
 
+fig = plt.figure()
+ax = fig.add_subplot(projection="3d")
+plt.plot(truth[:, 0], truth[:, 1], truth[:, 2])
+plt.plot(0, 0, 0, ms=100)
+ax.set_xlabel(r"$x$ [km]")
+ax.set_ylabel(r"$y$ [km]")
+ax.set_zlabel(r"$z$ [km]")
+ax.set_title("True Trajectory")
+plt.grid(True)
+plt.axis("Equal")
 
 plt.show()
