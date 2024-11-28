@@ -29,6 +29,11 @@ class MeasurementModel:
 
 
 class PosMeas(MeasurementModel):
+    def __init__(self, R=None, planar=False):
+        if R is None:
+            R = np.diag([100, 100] if planar else [100, 100, 100]) ** 2
+        super().__init__(R, planar)
+
     def get_measurement(self, t, x, noise=False):
         z = x[:2] if self.planar else x[:3]
         if noise:
@@ -38,18 +43,38 @@ class PosMeas(MeasurementModel):
 
 
 class RangeMeas(MeasurementModel):
+    def __init__(self, R=None, observer=None, planar=False):
+        if R is None:
+            R = np.array([[15e-3]]) ** 2
+        super().__init__(R, planar)
+        if observer is None:
+            observer = [0, 0] if self.planar else [0, 0, 0]
+
+        self.rO = np.array(observer)
+
     def get_measurement(self, t, x, noise=False):
         pos = x[:2] if self.planar else x[:3]
+        pos -= self.rO
         z = np.array([np.linalg.norm(pos)])
         if noise:
             z += mvrn(np.zeros_like(z), self.get_R(t, x))
         return z
 
 
-class RangeAndRArate(MeasurementModel):
+class RangeAndRate(MeasurementModel):
+    def __init__(self, R=None, observer=None, planar=False):
+        if R is None:
+            R = np.diag([15e-3, 0.20e-3]) ** 2
+        super().__init__(R, planar)
+        if observer is None:
+            observer = [0, 0] if self.planar else [0, 0, 0]
+
+        self.rO = np.array(observer)
+
     def get_measurement(self, t, x, noise=False):
         z = np.zeros(2)
         r = x[:2] if self.planar else x[:3]
+        r -= self.rO
         rmag = np.linalg.norm(r)
         z[0] = rmag
         v = x[2:4] if self.planar else x[3:6]
@@ -61,10 +86,10 @@ class RangeAndRArate(MeasurementModel):
 
 
 class DeclinationRA(MeasurementModel):
-    def __init__(self, R, planar=False):
-        super().__init__(R, planar)
-        # cannot be planar
-        assert not self.planar
+    def __init__(self, R=None):
+        if R is None:
+            R = np.diag([5e-6, 5e-6]) ** 2
+        super().__init__(R, planar=False)
 
     def get_measurement(self, t, x, noise=False):
         RA = np.atan2(x[1], x[0])
@@ -76,15 +101,17 @@ class DeclinationRA(MeasurementModel):
 
 
 class RangeDeclinationRA(MeasurementModel):
-    def __init__(self, R, planar=False):
-        super().__init__(R, planar)
-        # cannot be planar
-        assert not self.planar
+    def __init__(self, R=None, observer=None):
+        if R is None:
+            R = np.diag([15e-3, 5e-6, 5e-6]) ** 2
+        super().__init__(R, planar=False)
+
+        self.rO = np.zeros(3) if observer is None else np.array(observer)
 
     def get_measurement(self, t, x, noise=False):
         RA = np.atan2(x[1], x[0])
         decl = np.atan2(x[2], np.linalg.norm(x[:2]))
-        rho = np.linalg.norm(x[:3])
+        rho = np.linalg.norm(x[:3] - self.rO)
         z = np.array([rho, RA, decl])
         if noise:
             z += mvrn(np.zeros_like(z), self.get_R(t, x))
@@ -92,9 +119,11 @@ class RangeDeclinationRA(MeasurementModel):
 
 
 class WalkerPseudorange(MeasurementModel):
-    def __init__(self, R, i, t, p, f, r_sats, planar=False):
-        super().__init__(R, planar)
-        assert not planar
+    def __init__(self, R=None, i=0.9599, t: int = 24, p: int = 6, f=20, r_sats=26580):
+        if R is None:
+            R = np.diag([5] * t) ** 2
+
+        super().__init__(R, planar=False)
         npp = t // p
         df = 2 * np.pi * f / t
         thspace = np.linspace(0, 2 * np.pi, npp, False)
