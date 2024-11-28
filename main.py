@@ -18,7 +18,7 @@ P0 = np.diag([*[0.1**2] * 3, *[0.1**2] * 3, 1e3**2])
 case = r"Pos Measurement/$\mu$ Estimation"
 
 dt = 60 * 5
-propTime = 60 * 60 * 2
+propTime = 60 * 60 * 24
 
 accel_sigma = 1e-4
 
