@@ -1,5 +1,5 @@
-from MeasModels import *
-from ForceModels import *
+from Utils.MeasModels import *
+from Utils.ForceModels import *
 import numpy as np
 import numpy.typing as npt
 from scipy.integrate import solve_ivp

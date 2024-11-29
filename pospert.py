@@ -1,9 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from numpy.random import normal as rand
-from Filters import *
-from ForceModels import *
-from MeasModels import *
+from Utils.Filters import UnscentedKalmanFilter
+from Utils.ForceModels import *
+from Utils.MeasModels import *
 from tqdm import tqdm
 
 np.random.seed(0)
@@ -33,7 +33,7 @@ propagator = KeplerMass(Q(1), np.identity(len(P0)))
 params_x = [r"$x$", r"$y$", r"$z$", r"$v_x$", r"$v_y$", r"$v_z$", r"$\mu$"]
 units_x = [*["km"] * 3, *["km/s"] * 3, r"km$^3$/s$^2$"]
 
-sensor = RangeDeclinationRA(observer=np.array([6371, 0, 0]))
+sensor = PosMeas()
 params_z = [r"$x$", r"$y$", r"$z$"]
 units_z = [*["km"] * 3]
 

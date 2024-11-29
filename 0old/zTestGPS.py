@@ -2,9 +2,9 @@ import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
 from numpy.random import normal as rand
-from Filters import *
-from ForceModels import *
-from MeasModels import *
+from ..Utils.Filters import UnscentedKalmanFilter
+from ..Utils.ForceModels import *
+from ..Utils.MeasModels import *
 from tqdm import tqdm
 
 np.random.seed(0)
