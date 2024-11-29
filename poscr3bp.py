@@ -14,9 +14,9 @@ np.random.seed(0)
 
 mu = 3.9861e5  # km3/s2
 x0 = [6750, 0, 0, 0, 6, 8, mu]
-P0 = np.diag([*[0.1**2] * 3, *[0.1**2] * 3, 1e3**2])
+P0 = np.diag([*[0.1] * 3, *[0.1] * 3, 1e3]) ** 2
 
-case = r"Pos Measurement/$\mu$ Estimation"
+case = r"Pos Measurement/CR3BP $\mu$ Estimation"
 
 dt = 60 * 5
 propTime = 60 * 60 * 24

@@ -13,7 +13,7 @@ np.random.seed(0)
 
 mu = 3.9861e5  # km3/s2
 x0 = [6750, 0, 0, 0, 6, 8, mu]
-P0 = np.diag([*[0.1**2] * 3, *[0.1**2] * 3, 1e3**2])
+P0 = np.diag([*[0.1] * 3, *[0.1] * 3, 1e3]) ** 2
 
 case = r"Position Measurement/$\mu$ Estimation"
 

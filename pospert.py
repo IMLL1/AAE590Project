@@ -12,10 +12,11 @@ np.random.seed(0)
 # %% Configurable
 
 mu = 3.9861e5  # km3/s2
-x0 = [6750, 0, 0, 0, 6, 8, mu]
-P0 = np.diag([*[0.1**2] * 3, *[0.1**2] * 3, 1e3**2])
+pert_vec = [3e-6, 5e-6, 7e-6]
+x0 = [6750, 0, 0, 0, 6, 8, *pert_vec]
+P0 = np.diag([*[0.1] * 3, *[0.1] * 3, *[0.01e-3] * 3]) ** 2
 
-case = r"Pos Measurement/$\mu$ Estimation"
+case = r"Pos Measurement/$a_{pert}$ Estimation"
 
 dt = 60 * 5
 propTime = 60 * 60 * 24
@@ -29,9 +30,19 @@ def Q(extradim):
     return np.diag([*[sigmap] * 3, *[sigmav] * 3, *[0] * extradim]) ** 2
 
 
-propagator = KeplerMass(Q(1), np.identity(len(P0)))
-params_x = [r"$x$", r"$y$", r"$z$", r"$v_x$", r"$v_y$", r"$v_z$", r"$\mu$"]
-units_x = [*["km"] * 3, *["km/s"] * 3, r"km$^3$/s$^2$"]
+propagator = KeplerPerurbed(Q(3), np.identity(len(P0)), mu, pert_vec)
+params_x = [
+    r"$x$",
+    r"$y$",
+    r"$z$",
+    r"$v_x$",
+    r"$v_y$",
+    r"$v_z$",
+    r"$a_x$",
+    r"$a_y$",
+    r"$a_z$",
+]
+units_x = [*["km"] * 3, *["km/s"] * 3, *[r"km/s$^2$"] * 3]
 
 sensor = PosMeas()
 params_z = [r"$x$", r"$y$", r"$z$"]

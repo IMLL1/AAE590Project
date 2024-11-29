@@ -31,7 +31,7 @@ class MeasurementModel:
 class PosMeas(MeasurementModel):
     def __init__(self, R=None, planar=False):
         if R is None:
-            R = np.diag([100, 100] if planar else [100, 100, 100]) ** 2
+            R = np.diag([100e-3, 100e-3] if planar else [100e-3, 100e-3, 100e-3]) ** 2
         super().__init__(R, planar)
 
     def get_measurement(self, t, x, noise=False):
