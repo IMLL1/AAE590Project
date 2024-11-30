@@ -212,7 +212,7 @@ class CR3BPMassRatio(DynamicsModel):
 
         ddpos *= self.LU / self.TU**2
 
-        dx = np.zeros(4) if self.planar else np.zeros(6)
+        dx = np.zeros(5) if self.planar else np.zeros(7)
         velstart = 2 if self.planar else 3
         dx[:velstart] = x[velstart : 2 * velstart]
         dx[velstart : 2 * velstart] = ddpos

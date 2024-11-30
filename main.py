@@ -15,7 +15,7 @@ mu = 3.9861e5  # km3/s2
 x0 = [6750, 0, 0, 0, 6, 8, mu]
 P0 = np.diag([*[0.1**2] * 3, *[0.1**2] * 3, 1e3**2])
 
-case = r"Pos Measurement/$\mu$ Estimation"
+case = r"Description Here"
 
 dt = 60 * 5
 propTime = 60 * 60 * 24
@@ -81,7 +81,6 @@ for k in tqdm(range(1, len(t))):
 xhat = np.reshape(xhatp, (-1, nx))
 truth = np.array(truth)
 
-# do the same thing to xcont to compare
 err = xhat - truth
 bars = 3 * np.sqrt(np.array([np.diag(P) for P in Pp]))
 
@@ -94,8 +93,8 @@ plt.rcParams.update({"text.usetex": True, "font.family": "Computer Modern"})
 
 fig = plt.figure()
 gs = fig.add_gridspec(3, 3)
-
-fig.suptitle("Covariance Analysis\n" + case)
+t /= 60 * 60
+fig.suptitle("Covariance/Estimate Analysis\n" + case)
 for i in range(len(params_x)):
     ax = fig.add_subplot(gs[i // 3, i % 3])
     ax.step(t, err[:, i])
@@ -103,28 +102,30 @@ for i in range(len(params_x)):
     ax.step(t, -bars[:, i], "-r", lw=1, alpha=0.5)
     ax.grid(True)
     ax.set_title(params_x[i] + " [" + units_x[i] + "]")
+    ax.set_xlim([min(t), max(t)])
 
 fig.tight_layout()
 fig.legend(ax.get_lines()[0:2], ["Error", r"$3\sigma$ Bounds"], loc=1)
-fig.supxlabel(r"Time ($t$) [sec]")
+fig.supxlabel(r"Time ($t$) [hr]")
 fig.supylabel(r"Error ($e$) [plot-dependent]")
 
 
 fig = plt.figure()
-gs = fig.add_gridspec(3, 1)
+gs = fig.add_gridspec(6, 4)
 
 fig.suptitle("Measurement Residuals Analysis\n" + case)
 for i in range(len(params_z)):
-    ax = fig.add_subplot(gs[i // 1, i % 1])
-    ax.step(t, err[:, i])
-    ax.step(t, bars[:, i], "-r", lw=1, alpha=0.5)
-    ax.step(t, -bars[:, i], "-r", lw=1, alpha=0.5)
+    ax = fig.add_subplot(gs[i // gs._ncols, i % gs._ncols])
+    ax.step(t, epsilons[:, i])
+    ax.step(t, innovbars[:, i], "-r", lw=1, alpha=0.5)
+    ax.step(t, -innovbars[:, i], "-r", lw=1, alpha=0.5)
     ax.grid(True)
     ax.set_title(params_z[i] + " [" + units_z[i] + "]")
+    ax.set_xlim([min(t), max(t)])
 
 fig.tight_layout()
 fig.legend(ax.get_lines()[0:2], ["Residual", r"$3\sigma$ Bounds"], loc=1)
-fig.supxlabel(r"Time ($t$) [sec]")
+fig.supxlabel(r"Time ($t$) [hr]")
 fig.supylabel(r"Measurement Residual ($e$) [plot-dependent]")
 
 fig = plt.figure()

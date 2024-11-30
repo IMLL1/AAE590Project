@@ -86,15 +86,19 @@ class RangeAndRate(MeasurementModel):
 
 
 class DeclinationRA(MeasurementModel):
-    def __init__(self, R=None):
+    def __init__(self, R=None, observer=None):
         if R is None:
             R = np.diag([5e-6, 5e-6]) ** 2
         super().__init__(R, planar=False)
 
+        self.rO = np.zeros(3) if observer is None else np.array(observer)
+
     def get_measurement(self, t, x, noise=False):
-        RA = np.atan2(x[1], x[0])
-        Decl = np.atan2(x[2], np.linalg.norm(x[:2]))
-        z = np.array([RA, Decl])
+        pos = x[:3] - self.rO
+
+        RA = np.atan2(pos[1], pos[0])
+        decl = np.atan2(pos[2], np.linalg.norm(pos))
+        z = np.array([RA, decl])
         if noise:
             z += mvrn(np.zeros_like(z), self.get_R(t, x))
         return z
@@ -109,9 +113,11 @@ class RangeDeclinationRA(MeasurementModel):
         self.rO = np.zeros(3) if observer is None else np.array(observer)
 
     def get_measurement(self, t, x, noise=False):
-        RA = np.atan2(x[1], x[0])
-        decl = np.atan2(x[2], np.linalg.norm(x[:2]))
-        rho = np.linalg.norm(x[:3] - self.rO)
+        pos = x[:3] - self.rO
+
+        RA = np.atan2(pos[1], pos[0])
+        decl = np.atan2(pos[2], np.linalg.norm(pos))
+        rho = np.linalg.norm(pos)
         z = np.array([rho, RA, decl])
         if noise:
             z += mvrn(np.zeros_like(z), self.get_R(t, x))
@@ -121,7 +127,7 @@ class RangeDeclinationRA(MeasurementModel):
 class WalkerPseudorange(MeasurementModel):
     def __init__(self, R=None, i=0.9599, t: int = 24, p: int = 6, f=20, r_sats=26580):
         if R is None:
-            R = np.diag([5] * t) ** 2
+            R = np.diag([5e-3] * t) ** 2
 
         super().__init__(R, planar=False)
         npp = t // p
